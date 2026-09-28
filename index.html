@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Resume Tailor</title>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+<style>
+:root{
+  color-scheme: light dark;
+  --bg:#f6f5f1; --card:#ffffff; --ink:#1d1d1b; --muted:#6b6a64; --line:#e3e1d9;
+  --accent:#2f5d50; --accent-ink:#ffffff; --soft:#e8f0ec; --warn:#a4451f; --warn-soft:#f8e9e2; --ok:#2f5d50;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#161715; --card:#20211f; --ink:#ecebe6; --muted:#a3a29a; --line:#34352f;
+    --accent:#7fb8a4; --accent-ink:#10201a; --soft:#22322c; --warn:#e58a63; --warn-soft:#3a2a22; --ok:#7fb8a4;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:920px;margin:0 auto;padding:calc(28px + env(safe-area-inset-top,0px)) 18px calc(80px + env(safe-area-inset-bottom,0px))}
+h1{font-size:26px;margin:0 0 4px;letter-spacing:-.01em}
+h2{font-size:17px;margin:0 0 10px}
+h3{font-size:13px;margin:18px 0 6px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.sub{color:var(--muted);margin:0 0 22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}}
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;border:2px dashed var(--line);border-radius:12px;padding:26px 14px;cursor:pointer;min-height:190px;transition:.15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--soft)}
+.drop input{display:none}
+.drop .big{font-weight:600}
+.drop .small{color:var(--muted);font-size:13px}
+.file-ok{color:var(--ok);font-weight:600;word-break:break-all}
+textarea,input[type=password]{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:12px;padding:12px;font:inherit}
+textarea{min-height:190px;resize:vertical}
+textarea:focus,input:focus{outline:2px solid var(--accent)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button{font:inherit;border:0;border-radius:10px;padding:10px 18px;cursor:pointer;font-weight:600;background:var(--accent);color:var(--accent-ink)}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.steps{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 4px}
+.pill{font-size:13px;padding:6px 12px;border-radius:99px;border:1px solid var(--line);color:var(--muted);display:flex;gap:6px;align-items:center}
+.pill.running{border-color:var(--accent);color:var(--ink)}
+.pill.done{background:var(--soft);color:var(--ok);border-color:transparent}
+.pill.error{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.5}
+.pill.running .dot{animation:pulse 1s infinite;opacity:1}
+@keyframes pulse{50%{opacity:.2}}
+.live{margin-top:10px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--muted);max-height:64px;overflow:hidden;white-space:pre-wrap;word-break:break-all}
+.msg{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--warn-soft);color:var(--warn);font-size:14px}
+.hidden{display:none!important}
+.score{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.ring{width:96px;height:96px;border-radius:50%;background:conic-gradient(var(--accent) calc(var(--p)*1%),var(--line) 0);display:grid;place-items:center;flex:none}
+.ring b{width:74px;height:74px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-size:26px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--soft);color:var(--ok);padding:5px 11px;border-radius:99px;font-size:13px;font-weight:600}
+.flag{border-left:3px solid var(--warn);padding:4px 0 4px 12px;margin:10px 0}
+.flag b{color:var(--warn)}
+.muted{color:var(--muted)}
+ul{margin:6px 0 6px 18px;padding:0}
+li{margin:3px 0}
+details{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}
+summary{cursor:pointer;font-weight:600}
+.role{margin:12px 0}
+.role .t{font-weight:600}
+.paper{background:#fff;color:#111;border:1px solid var(--line);border-radius:6px;padding:22px 26px;font-size:13px;line-height:1.45;overflow-x:auto}
+.paper h4{margin:12px 0 4px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #999;padding-bottom:2px}
+.paper .nm{text-align:center;font-size:20px;font-weight:700}
+.paper .ct{text-align:center;color:#444}
+.paper .rl{display:flex;justify-content:space-between;gap:10px;font-weight:600;margin-top:8px}
+.paper .rl span:last-child{font-weight:400;white-space:nowrap}
+.paper ul{margin:3px 0 3px 18px}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tab{background:transparent;color:var(--muted);border:1px solid var(--line);padding:7px 14px}
+.tab.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+#cover{min-height:380px;font-family:Georgia,serif;font-size:14px;background:#fff;color:#111}
+.foot{color:var(--muted);font-size:12.5px;margin-top:22px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Resume Tailor</h1>
+  <p class="sub">Upload your resume, paste the job description, and get a tailored ATS-friendly resume and cover letter in Word format.</p>
+
+  <div class="card hidden" id="gate">
+    <h2>Access code</h2>
+    <div class="row">
+      <input type="password" id="code" placeholder="Enter your access code" autocomplete="current-password" style="flex:1;min-width:200px">
+      <button id="saveCode">Save on this device</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>1. Your resume</h2>
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept=".docx">
+        <div class="big" id="dropTitle">Tap to upload or drop a file</div>
+        <div class="small" id="dropSub">Word document (.docx)</div>
+      </label>
+    </div>
+    <div class="card">
+      <h2>2. Job description</h2>
+      <textarea id="jd" placeholder="Paste the full job description here (include the company name and role title)"></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <button id="run" disabled>Tailor my resume</button>
+      <button id="stop" class="ghost hidden">Stop</button>
+      <button id="reset" class="ghost hidden">Start over</button>
+      <span class="muted" id="hint"></span>
+    </div>
+    <div class="steps" id="steps"></div>
+    <div class="live hidden" id="live"></div>
+    <div class="msg hidden" id="err"></div>
+  </div>
+
+  <div id="results"></div>
+
+  <div class="card hidden" id="finalCard">
+    <h2>Your tailored documents</h2>
+    <div class="tabs">
+      <button class="tab on" data-tab="resume">Resume</button>
+      <button class="tab" data-tab="cover">Cover letter</button>
+    </div>
+    <div id="tabResume">
+      <div class="paper" id="paper"></div>
+      <div class="row" style="margin-top:12px">
+        <button id="dlResume">Download resume (.docx)</button>
+      </div>
+    </div>
+    <div id="tabCover" class="hidden">
+      <textarea id="cover"></textarea>
+      <div class="row" style="margin-top:12px">
+        <button id="dlCover">Download cover letter (.docx)</button>
+        <button id="copyCover" class="ghost">Copy text</button>
+      </div>
+    </div>
+    <p class="foot">Check every number and date before you send. Anything in [square brackets] is a placeholder where your original resume had no metric, so fill it in with a real figure or delete it.</p>
+  </div>
+
+  <p class="foot">Your resume and job description are sent to Anthropic's API to generate the results. Nothing is stored on the server.</p>
+</main>
+
+<script>
+(function(){
+  const STEPS = ["Recruiter analysis","Rewrite experience","ATS and skim test","Final resume and letter"];
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const clean = s => String(s==null?"":s).replace(/\s+/g," ").trim();
+
+  let resumeText = "", style = null;
+  let results = {};
+  let ctl = null, running = false;
+
+  // ---------- access code ----------
+  const getCode = () => { try{ return localStorage.getItem("rt_code")||""; }catch(e){ return ""; } };
+  const setCode = v => { try{ localStorage.setItem("rt_code",v); }catch(e){} };
+  function needCode(){ $("gate").classList.remove("hidden"); }
+  if(!getCode()) needCode();
+  $("saveCode").addEventListener("click",()=>{
+    const v=$("code").value.trim(); if(!v) return;
+    setCode(v); $("gate").classList.add("hidden"); clearErr(); refresh();
+  });
+
+  // ---------- upload ----------
+  const drop = $("drop"), fileIn = $("file");
+  ["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over")}));
+  ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over")}));
+  drop.addEventListener("drop",e=>{ if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+  fileIn.addEventListener("change",()=>{ if(fileIn.files[0]) handleFile(fileIn.files[0]); });
+
+  async function handleFile(f){
+    clearErr();
+    if(!/\.docx$/i.test(f.name)){ showErr("Please upload a Word .docx file."); return; }
+    try{
+      const buf = await f.arrayBuffer();
+      const r = await mammoth.extractRawText({arrayBuffer: buf.slice(0)});
+      resumeText = (r.value||"").replace(/\n{3,}/g,"\n\n").trim();
+      if(resumeText.length < 200) throw new Error("Couldn't find enough text in that file.");
+      style = await readStyle(buf);
+      $("dropTitle").innerHTML = '<span class="file-ok">'+esc(f.name)+'</span>';
+      $("dropSub").textContent = style.font+", "+(style.size/2)+" pt · tap to replace";
+      results = {}; renderAll();
+    }catch(e){
+      resumeText=""; showErr("Couldn't read that file: "+(e.message||e));
+    }
+    refresh();
+  }
+
+  async function readStyle(buf){
+    const out = {font:"Calibri", size:22, top:1000, right:1000, bottom:1000, left:1000, w:11906, h:16838};
+    try{
+      const zip = await JSZip.loadAsync(buf);
+      const doc = await zip.file("word/document.xml").async("string");
+      const sty = zip.file("word/styles.xml") ? await zip.file("word/styles.xml").async("string") : "";
+      const tally = (re,src)=>{ const m={}; let x; while((x=re.exec(src))){ m[x[1]]=(m[x[1]]||0)+1; } return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
+      const fonts = tally(/<w:rFonts[^>]*w:ascii="([^"]+)"/g, doc);
+      if(fonts.length) out.font = fonts[0][0];
+      else{ const d = /<w:docDefaults>[\s\S]*?<w:rFonts[^>]*w:ascii="([^"]+)"/.exec(sty); if(d) out.font=d[1]; }
+      const sizes = tally(/<w:sz w:val="(\d+)"/g, doc);
+      if(sizes.length) out.size = +sizes[0][0];
+      else{ const d = /<w:docDefaults>[\s\S]*?<w:sz w:val="(\d+)"/.exec(sty); if(d) out.size=+d[1]; }
+      out.size = Math.min(24, Math.max(19, out.size));
+      const pm = [...doc.matchAll(/<w:pgMar[^>]*>/g)].pop();
+      if(pm){ for(const k of ["top","right","bottom","left"]){ const m = new RegExp('w:'+k+'="(-?\\d+)"').exec(pm[0]); if(m) out[k]=Math.max(500,Math.abs(+m[1])); } }
+      const ps = [...doc.matchAll(/<w:pgSz[^>]*>/g)].pop();
+      if(ps){ const w=/w:w="(\d+)"/.exec(ps[0]), h=/w:h="(\d+)"/.exec(ps[0]); if(w) out.w=+w[1]; if(h) out.h=+h[1]; }
+    }catch(e){}
+    return out;
+  }
+
+  $("jd").addEventListener("input",()=>{ if(Object.keys(results).length){ results={}; renderAll(); } refresh(); });
+
+  function refresh(){
+    const ok = resumeText && $("jd").value.trim().length > 80;
+    const done = Object.keys(results).length;
+    $("run").disabled = !ok || running;
+    $("run").textContent = done && done<4 ? "Resume from step "+(done+1) : "Tailor my resume";
+    $("reset").classList.toggle("hidden", running || !done);
+    $("hint").textContent = running ? "Working. Four steps run one after another." :
+      ok ? "" : (resumeText ? "Paste the job description to continue." : "Upload a .docx and paste a job description to start.");
+  }
+
+  $("reset").addEventListener("click",()=>{ results={}; clearErr(); renderAll(); refresh(); });
+
+  // ---------- prompts ----------
+  const RULES = `Ground rules that apply to everything you write:
+- Use only facts found in the candidate's resume. Never invent employers, titles, dates, tools, or numbers.
+- If a bullet would benefit from a metric that the resume does not provide, write a short bracketed placeholder such as [X%] or [N users] so the candidate can fill it in. Do not guess a figure.
+- Write like a real person: plain verbs, short sentences, no buzzwords such as "spearheaded", "leveraged", "synergy", "results-driven", "dynamic". No first-person pronouns in bullets.
+- Work keywords in only where they honestly describe the candidate's work.`;
+
+  const XYZ = `Bullet style: Google's XYZ formula, "Accomplished [X] as measured by [Y] by doing [Z]". Do not copy that wording literally. Each bullet should read as one natural sentence that makes the result, the measure, and the method clear.`;
+
+  function ctx(){
+    return "=== CANDIDATE RESUME (plain text) ===\n"+resumeText.slice(0,22000)+"\n\n=== JOB DESCRIPTION ===\n"+$("jd").value.trim().slice(0,12000);
+  }
+
+  const P = [
+    ()=>`Act as a senior recruiter at the exact company that posted this job. Identify the company and role from the job description.
+Analyze the resume against the job description and give: a match score out of 100 with a one-sentence rationale, the top 5 missing keywords (exact terms from the job description that the resume lacks or under-uses), the 3 red flags a hiring manager would spot in under 10 seconds, and the top 3 genuine strengths to lean on.
+Reply with only JSON in this shape:
+{"company":"","roleTitle":"","matchScore":0,"scoreRationale":"","missingKeywords":[{"keyword":"","whyItMatters":""}],"redFlags":[{"flag":"","fix":""}],"strengths":[""]}
+
+${ctx()}`,
+
+    ()=>`You are an expert resume writer. Using the recruiter analysis below, rewrite the candidate's experience section so it naturally includes the missing keywords (only where truthful) and fixes the 3 red flags. Also write a short professional summary (2 to 3 sentences) aimed at this role.
+${XYZ}
+${RULES}
+Keep the same jobs, employers, titles and dates as the resume. Give 4 to 6 bullets for recent roles, 2 to 3 for older roles, and for roles older than about 12 years use 1 to 2 short bullets so the final resume stays at two pages.
+Reply with only JSON in this shape:
+{"summary":"","experience":[{"title":"","company":"","location":"","dates":"","bullets":[""]}],"keywordsUsed":[""],"flagsFixed":[""]}
+
+=== RECRUITER ANALYSIS ===
+${JSON.stringify(results[0])}
+
+${ctx()}`,
+
+    ()=>`Now play two roles at once: an ATS parser, and a hiring manager skimming 200 resumes in one sitting. Read the candidate's new resume (summary and experience below, plus the education, skills and certifications from the original resume) and decide which sections or bullets would get skipped, and why (buried keywords, vague openers, no numbers, walls of text, non-standard headings, and so on). Then rewrite those parts so they stop the scroll: strong first words, the result up front, specific and human.
+${XYZ}
+${RULES}
+Return the improved summary and the complete improved experience list (all roles, not just the changed ones).
+Reply with only JSON in this shape:
+{"skippedSections":[{"section":"","why":""}],"atsIssues":[""],"summary":"","experience":[{"title":"","company":"","location":"","dates":"","bullets":[""]}],"whatChanged":[""]}
+
+=== NEW SUMMARY AND EXPERIENCE (from step 2) ===
+${JSON.stringify({summary:results[1].summary,experience:results[1].experience})}
+
+${ctx()}`,
+
+    ()=>`Produce the final application documents.
+1) A complete resume as structured JSON, built from the improved summary and experience in step 3 and the candidate's original contact details, skills, education, certifications, languages and other sections. Use plain, standard section names an ATS recognizes. Group skills by category and lead with the terms the job description uses (only ones the candidate truly has). Keep it to two pages at most, so trim older or irrelevant details.
+2) A cover letter for this exact role and company, 250 to 330 words, conversational and specific, that opens with a real hook rather than "I am writing to apply", ties two or three real achievements from the resume to the role's needs, and closes with a simple next step. Address it to "Hiring Team" if no name is given. Use \\n\\n between paragraphs and end with the candidate's name.
+${RULES}
+Reply with only JSON in this shape:
+{"resume":{"name":"","contact":["email","phone","city","links"],"summary":"","skills":[{"category":"","items":[""]}],"experience":[{"title":"","company":"","location":"","dates":"","bullets":[""]}],"education":[{"degree":"","institution":"","dates":"","details":""}],"certifications":[""],"additional":[{"heading":"","items":[""]}]},"coverLetter":""}
+
+=== ROLE ===
+${results[0].company} · ${results[0].roleTitle}
+
+=== IMPROVED SUMMARY AND EXPERIENCE (from step 3) ===
+${JSON.stringify({summary:results[2].summary,experience:results[2].experience})}
+
+${ctx()}`
+  ];
+
+  // ---------- API call (streams from /api/claude) ----------
+  function parseJson(text){
+    let t = text.trim().replace(/^```(?:json)?\s*/i,"").replace(/```\s*$/,"");
+    try{ return JSON.parse(t); }catch(e){}
+    const a = t.indexOf("{"), b = t.lastIndexOf("}");
+    if(a>=0 && b>a){ try{ return JSON.parse(t.slice(a,b+1)); }catch(e){} }
+    throw {code:"invalid_json", message:"Reply was not valid JSON."};
+  }
+
+  async function callClaude(prompt, signal, onText){
+    let res;
+    try{
+      res = await fetch("/api/claude",{
+        method:"POST", signal,
+        headers:{"content-type":"application/json","x-access-code":getCode()},
+        body:JSON.stringify({prompt})
+      });
+    }catch(e){
+      if(e.name==="AbortError") throw {code:"cancelled"};
+      throw {code:"network", message:"Network error."};
+    }
+    if(res.status===401) throw {code:"unauthorized"};
+    if(!res.ok){
+      let m=""; try{ m=(await res.json()).error; }catch(e){}
+      throw {code:"server", message:m||("Server error "+res.status)};
+    }
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf="", text="", truncated=false;
+    try{
+      while(true){
+        const {value,done} = await reader.read();
+        if(done) break;
+        buf += dec.decode(value,{stream:true});
+        const lines = buf.split("\n"); buf = lines.pop();
+        for(const line of lines){
+          if(!line.startsWith("data:")) continue;
+          const d = line.slice(5).trim(); if(!d) continue;
+          let ev; try{ ev=JSON.parse(d); }catch(e){ continue; }
+          if(ev.type==="content_block_delta" && ev.delta && ev.delta.type==="text_delta"){ text += ev.delta.text; onText && onText(text); }
+          else if(ev.type==="message_delta" && ev.delta && ev.delta.stop_reason==="max_tokens"){ truncated=true; }
+          else if(ev.type==="error"){ throw {code:"server", message:(ev.error&&ev.error.message)||"Stream error."}; }
+        }
+      }
+    }catch(e){
+      if(e && e.name==="AbortError") throw {code:"cancelled"};
+      throw e;
+    }
+    if(truncated) throw {code:"invalid_json", message:"Answer was cut off."};
+    return parseJson(text);
+  }
+
+  // ---------- pipeline ----------
+  $("run").addEventListener("click", run);
+  $("stop").addEventListener("click", ()=>{ if(ctl) ctl.abort(); });
+
+  async function run(){
+    if(running) return;
+    if(!getCode()){ needCode(); showErr("Enter your access code first."); return; }
+    clearErr(); running = true; $("stop").classList.remove("hidden"); refresh();
+    let i = 0; while(results[i]) i++;
+    let failedAt = -1;
+    try{
+      for(; i<4; i++){
+        failedAt = i;
+        setPills(i,"running");
+        ctl = new AbortController();
+        $("live").classList.remove("hidden"); $("live").textContent = "Thinking…";
+        const out = await callClaude(P[i](), ctl.signal, t=>{ $("live").textContent = t.slice(-260); });
+        results[i] = validate(i,out);
+        renderAll();
+        failedAt = -1;
+      }
+      setPills(4,"done");
+    }catch(e){
+      const map = {
+        cancelled:"Stopped. Press the button to continue from the same step.",
+        unauthorized:"Wrong access code.",
+        invalid_json:"The reply came back incomplete. Press the button to try this step again.",
+        network:"Network problem. Check your connection and press the button to continue."
+      };
+      if(e && e.code==="unauthorized"){ try{localStorage.removeItem("rt_code");}catch(_){} needCode(); }
+      showErr(map[e&&e.code] || ("Something went wrong: "+((e&&e.message)||e)));
+      if(failedAt>=0) setPills(failedAt, e&&e.code==="cancelled"?"":"error");
+    }finally{
+      running=false; $("stop").classList.add("hidden"); $("live").classList.add("hidden"); refresh();
+    }
+  }
+
+  function validate(i,o){
+    if(!o || typeof o!=="object") throw {code:"invalid_json",message:"Empty reply."};
+    if(i===0){ o.matchScore = Math.max(0,Math.min(100,Math.round(+o.matchScore||0))); o.missingKeywords=(o.missingKeywords||[]).slice(0,5); o.redFlags=(o.redFlags||[]).slice(0,3); }
+    if(i===1||i===2){ if(!Array.isArray(o.experience)||!o.experience.length) throw {code:"invalid_json",message:"No experience returned."}; }
+    if(i===3){ if(!o.resume||!Array.isArray(o.resume.experience)||!o.coverLetter) throw {code:"invalid_json",message:"Incomplete reply."}; }
+    return o;
+  }
+
+  // ---------- rendering ----------
+  function setPills(active,state){
+    const el = $("steps"); el.innerHTML="";
+    STEPS.forEach((s,k)=>{
+      let st = "";
+      if(results[k]) st="done"; else if(k===active) st=state;
+      const d=document.createElement("div"); d.className="pill "+st;
+      d.innerHTML='<span class="dot"></span>'+(k+1)+". "+esc(s);
+      el.appendChild(d);
+    });
+  }
+
+  function roleHtml(r){
+    return '<div class="role"><div class="t">'+esc(r.title)+' · '+esc(r.company)+'</div><div class="muted">'+esc([r.location,r.dates].filter(Boolean).join(" · "))+'</div><ul>'+(r.bullets||[]).map(b=>'<li>'+esc(b)+'</li>').join("")+'</ul></div>';
+  }
+
+  function renderAll(){
+    setPills(-1,"");
+    const box = $("results"); box.innerHTML = "";
+    const a=results[0], b=results[1], c=results[2], d=results[3];
+    if(a){
+      const el=document.createElement("div"); el.className="card";
+      el.innerHTML = '<h2>1. Recruiter view'+(a.company?' · '+esc(a.company):'')+(a.roleTitle?' · '+esc(a.roleTitle):'')+'</h2>'+
+        '<div class="score"><div class="ring" style="--p:'+a.matchScore+'"><b>'+a.matchScore+'</b></div><div style="flex:1;min-width:220px"><b>Match score out of 100</b><div class="muted">'+esc(a.scoreRationale)+'</div></div></div>'+
+        '<h3>Top missing keywords</h3><div class="chips">'+(a.missingKeywords||[]).map(k=>'<span class="chip" title="'+esc(k.whyItMatters)+'">'+esc(k.keyword)+'</span>').join("")+'</div>'+
+        '<h3>Red flags spotted in 10 seconds</h3>'+(a.redFlags||[]).map(f=>'<div class="flag"><b>'+esc(f.flag)+'</b><div class="muted">Fix: '+esc(f.fix)+'</div></div>').join("")+
+        ((a.strengths||[]).length?'<h3>Strengths to lean on</h3><ul>'+a.strengths.map(s=>'<li>'+esc(s)+'</li>').join("")+'</ul>':'');
+      box.appendChild(el);
+    }
+    if(b){
+      const el=document.createElement("div"); el.className="card";
+      el.innerHTML='<h2>2. Rewritten experience</h2><details><summary>Show the rewrite</summary><h3>Summary</h3><p>'+esc(b.summary)+'</p>'+b.experience.map(roleHtml).join("")+'</details>';
+      box.appendChild(el);
+    }
+    if(c){
+      const el=document.createElement("div"); el.className="card";
+      el.innerHTML='<h2>3. ATS and skim test</h2>'+
+        '<h3>Would get skipped</h3>'+(c.skippedSections||[]).map(s=>'<div class="flag"><b>'+esc(s.section)+'</b><div class="muted">'+esc(s.why)+'</div></div>').join("")+
+        ((c.atsIssues||[]).length?'<h3>ATS issues</h3><ul>'+c.atsIssues.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>':'')+
+        ((c.whatChanged||[]).length?'<h3>What changed</h3><ul>'+c.whatChanged.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>':'');
+      box.appendChild(el);
+    }
+    if(d){
+      $("finalCard").classList.remove("hidden");
+      $("paper").innerHTML = paperHtml(d.resume);
+      $("cover").value = d.coverLetter;
+    }else{
+      $("finalCard").classList.add("hidden");
+    }
+  }
+
+  function paperHtml(r){
+    const list = a => (a||[]).filter(Boolean);
+    let h = '<div class="nm">'+esc(r.name)+'</div><div class="ct">'+esc(list(r.contact).join(" | "))+'</div>';
+    if(r.summary) h += '<h4>Professional Summary</h4><div>'+esc(r.summary)+'</div>';
+    if(list(r.skills).length) h += '<h4>Skills</h4>'+r.skills.map(s=>'<div><b>'+esc(s.category)+':</b> '+esc(list(s.items).join(", "))+'</div>').join("");
+    h += '<h4>Professional Experience</h4>'+r.experience.map(x=>'<div class="rl"><span>'+esc([x.title,x.company,x.location].filter(Boolean).join(", "))+'</span><span>'+esc(x.dates)+'</span></div><ul>'+list(x.bullets).map(b=>'<li>'+esc(b)+'</li>').join("")+'</ul>').join("");
+    if(list(r.education).length) h += '<h4>Education</h4>'+r.education.map(e=>'<div class="rl"><span>'+esc([e.degree,e.institution].filter(Boolean).join(", "))+'</span><span>'+esc(e.dates)+'</span></div>'+(e.details?'<div>'+esc(e.details)+'</div>':'')).join("");
+    if(list(r.certifications).length) h += '<h4>Certifications</h4><div>'+esc(r.certifications.join(", "))+'</div>';
+    (r.additional||[]).forEach(s=>{ if(list(s.items).length) h += '<h4>'+esc(s.heading)+'</h4><div>'+esc(s.items.join(", "))+'</div>'; });
+    return h;
+  }
+
+  document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x===t));
+    $("tabResume").classList.toggle("hidden",t.dataset.tab!=="resume");
+    $("tabCover").classList.toggle("hidden",t.dataset.tab!=="cover");
+  }));
+
+  // ---------- Word export ----------
+  const sty = () => style || {font:"Calibri",size:22,top:1000,right:1000,bottom:1000,left:1000,w:11906,h:16838};
+
+  function buildResume(r){
+    const D = docx, st = sty(), font = st.font, sz = st.size;
+    const width = st.w - st.left - st.right;
+    const run = (t,o={}) => new D.TextRun({text:t, font, size:o.size||sz, bold:o.bold});
+    const kids = [];
+    kids.push(new D.Paragraph({alignment:D.AlignmentType.CENTER, spacing:{after:40}, children:[run(clean(r.name),{bold:true,size:sz+10})]}));
+    const contact = (r.contact||[]).map(clean).filter(Boolean).join(" | ");
+    if(contact) kids.push(new D.Paragraph({alignment:D.AlignmentType.CENTER, spacing:{after:120}, children:[run(contact)]}));
+    const head = t => new D.Paragraph({spacing:{before:200,after:80}, keepNext:true, border:{bottom:{style:D.BorderStyle.SINGLE,size:6,color:"666666",space:1}}, children:[run(t.toUpperCase(),{bold:true})]});
+    const bullet = t => new D.Paragraph({numbering:{reference:"bul",level:0}, spacing:{after:40}, children:[run(clean(t))]});
+    const twoCol = (left,right) => new D.Paragraph({tabStops:[{type:D.TabStopType.RIGHT,position:width}], spacing:{before:100,after:30}, keepNext:true, children:[run(left,{bold:true}), run("\t"+right)]});
+
+    if(r.summary){ kids.push(head("Professional Summary")); kids.push(new D.Paragraph({spacing:{after:40}, children:[run(clean(r.summary))]})); }
+    if((r.skills||[]).length){
+      kids.push(head("Skills"));
+      r.skills.forEach(s=>kids.push(new D.Paragraph({spacing:{after:30}, children:[run(clean(s.category)+": ",{bold:true}), run((s.items||[]).map(clean).filter(Boolean).join(", "))]})));
+    }
+    kids.push(head("Professional Experience"));
+    (r.experience||[]).forEach(x=>{
+      kids.push(twoCol([clean(x.title),clean(x.company),clean(x.location)].filter(Boolean).join(", "), clean(x.dates)));
+      (x.bullets||[]).forEach(b=>kids.push(bullet(b)));
+    });
+    if((r.education||[]).length){
+      kids.push(head("Education"));
+      r.education.forEach(e=>{
+        kids.push(twoCol([clean(e.degree),clean(e.institution)].filter(Boolean).join(", "), clean(e.dates)));
+        if(e.details) kids.push(new D.Paragraph({spacing:{after:30}, children:[run(clean(e.details))]}));
+      });
+    }
+    if((r.certifications||[]).length){
+      kids.push(head("Certifications"));
+      kids.push(new D.Paragraph({children:[run(r.certifications.map(clean).filter(Boolean).join(", "))]}));
+    }
+    (r.additional||[]).forEach(s=>{
+      const items=(s.items||[]).map(clean).filter(Boolean);
+      if(!items.length) return;
+      kids.push(head(clean(s.heading)));
+      kids.push(new D.Paragraph({children:[run(items.join(", "))]}));
+    });
+    const doc = new D.Document({
+      creator: clean(r.name), title: clean(r.name)+" Resume",
+      numbering:{config:[{reference:"bul",levels:[{level:0,format:D.LevelFormat.BULLET,text:"•",alignment:D.AlignmentType.LEFT,style:{paragraph:{indent:{left:360,hanging:220}}}}]}]},
+      styles:{default:{document:{run:{font,size:sz}}}},
+      sections:[{properties:{page:{size:{width:st.w,height:st.h},margin:{top:st.top,right:st.right,bottom:st.bottom,left:st.left}}},children:kids}]
+    });
+    return D.Packer.toBlob(doc);
+  }
+
+  function buildCover(text,name){
+    const D = docx, st = sty(), font = st.font, sz = st.size;
+    const paras = String(text).split(/\n{2,}/).map(p=>p.replace(/\n/g," ").trim()).filter(Boolean);
+    const kids = paras.map(p=>new D.Paragraph({spacing:{after:200,line:276}, children:[new D.TextRun({text:p,font,size:sz})]}));
+    const doc = new D.Document({
+      creator:name||"", title:"Cover letter",
+      styles:{default:{document:{run:{font,size:sz}}}},
+      sections:[{properties:{page:{size:{width:st.w,height:st.h},margin:{top:1440,right:1440,bottom:1440,left:1440}}},children:kids}]
+    });
+    return D.Packer.toBlob(doc);
+  }
+
+  function saveBlob(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url; a.download=filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);
+  }
+  const fileBase = () => {
+    const d = results[3]; const nm = clean((d&&d.resume&&d.resume.name)||"Resume").replace(/[^\w\- ]+/g,"").replace(/\s+/g,"_");
+    const co = clean((results[0]&&results[0].company)||"").replace(/[^\w\- ]+/g,"").replace(/\s+/g,"_");
+    return nm+(co?"_"+co:"");
+  };
+  $("dlResume").addEventListener("click", async()=>{ clearErr(); try{ saveBlob(await buildResume(results[3].resume), fileBase()+"_Resume.docx"); }catch(e){ showErr("Couldn't build the Word file: "+(e.message||e)); } });
+  $("dlCover").addEventListener("click", async()=>{ clearErr(); try{ saveBlob(await buildCover($("cover").value, results[3].resume.name), fileBase()+"_Cover_Letter.docx"); }catch(e){ showErr("Couldn't build the Word file: "+(e.message||e)); } });
+  $("copyCover").addEventListener("click", async()=>{
+    const t=$("cover").value;
+    try{ await navigator.clipboard.writeText(t); }catch(e){ $("cover").select(); try{ document.execCommand("copy"); }catch(_){} }
+    $("copyCover").textContent="Copied"; setTimeout(()=>$("copyCover").textContent="Copy text",1500);
+  });
+
+  function showErr(m){ const e=$("err"); e.textContent=m; e.classList.remove("hidden"); }
+  function clearErr(){ $("err").classList.add("hidden"); }
+
+  setPills(-1,""); refresh();
+})();
+</script>
+</body>
+</html>
