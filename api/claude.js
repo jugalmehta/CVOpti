@@ -1,12 +1,27 @@
 // Vercel Serverless Function (Node.js runtime).
 // Keeps your Anthropic API key on the server and streams the answer back to the browser.
+//
+// Token/cost note: the resume + job description are identical across the app's 4
+// sequential calls, so they're sent as their own cacheable block (cache_control),
+// and the ground rules live once in this static system prompt (also cached). After
+// the first call, the other three reuse both at a fraction of the token cost instead
+// of re-billing the same resume and instructions every time. Nothing about the
+// wording or the results changes -- only what gets billed as fresh input.
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
-const MAX_PROMPT_CHARS = 80000;
+const MAX_CONTEXT_CHARS = 40000;
+const MAX_INSTRUCTION_CHARS = 20000;
 
-const SYSTEM =
-  "You are an expert recruiter and resume writer. Reply with a single valid JSON value only. " +
-  "No markdown fences, no commentary before or after the JSON.";
+const SYSTEM = `You are an expert recruiter and resume writer helping a candidate tailor a resume and cover letter to a specific job description.
+
+Ground rules that apply to everything you write:
+- Use only facts found in the candidate's resume. Never invent employers, titles, dates, tools, or numbers.
+- If a bullet would benefit from a metric that the resume does not provide, write a short bracketed placeholder such as [X%] or [N users] so the candidate can fill it in. Do not guess a figure.
+- Write like a real person: plain verbs, short sentences, no buzzwords such as "spearheaded", "leveraged", "synergy", "results-driven", "dynamic". No first-person pronouns in bullets.
+- Work keywords in only where they honestly describe the candidate's work.
+- Bullet style, when you write resume bullets: Google's XYZ formula, "Accomplished [X] as measured by [Y] by doing [Z]". Do not copy that wording literally -- each bullet should read as one natural sentence that makes the result, the measure, and the method clear.
+
+Reply with a single valid JSON value only. No markdown fences, no commentary before or after the JSON. The exact JSON shape is given in each request.`;
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
@@ -24,9 +39,10 @@ module.exports = async (req, res) => {
   if (typeof body === "string") {
     try { body = JSON.parse(body); } catch { body = {}; }
   }
-  const prompt = body && typeof body.prompt === "string" ? body.prompt : "";
-  if (!prompt || prompt.length > MAX_PROMPT_CHARS) {
-    res.status(400).json({ error: "Prompt is empty or too long." });
+  const context = body && typeof body.context === "string" ? body.context : "";
+  const instruction = body && typeof body.instruction === "string" ? body.instruction : "";
+  if (!context || !instruction || context.length > MAX_CONTEXT_CHARS || instruction.length > MAX_INSTRUCTION_CHARS) {
+    res.status(400).json({ error: "Request is missing context/instruction, or one of them is too long." });
     return;
   }
 
@@ -43,8 +59,21 @@ module.exports = async (req, res) => {
         model: MODEL,
         max_tokens: 8000,
         stream: true,
-        system: SYSTEM,
-        messages: [{ role: "user", content: prompt }],
+        system: [
+          { type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } },
+        ],
+        messages: [
+          {
+            role: "user",
+            content: [
+              // Resume + job description: identical across this app's 4 calls, so
+              // it's marked as its own cache breakpoint.
+              { type: "text", text: context, cache_control: { type: "ephemeral" } },
+              // The per-step ask, which changes call to call and stays uncached.
+              { type: "text", text: instruction },
+            ],
+          },
+        ],
       }),
     });
   } catch (e) {
