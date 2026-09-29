@@ -214,14 +214,11 @@ summary{cursor:pointer;font-weight:600}
   $("reset").addEventListener("click",()=>{ results={}; clearErr(); renderAll(); refresh(); });
 
   // ---------- prompts ----------
-  const RULES = `Ground rules that apply to everything you write:
-- Use only facts found in the candidate's resume. Never invent employers, titles, dates, tools, or numbers.
-- If a bullet would benefit from a metric that the resume does not provide, write a short bracketed placeholder such as [X%] or [N users] so the candidate can fill it in. Do not guess a figure.
-- Write like a real person: plain verbs, short sentences, no buzzwords such as "spearheaded", "leveraged", "synergy", "results-driven", "dynamic". No first-person pronouns in bullets.
-- Work keywords in only where they honestly describe the candidate's work.`;
-
-  const XYZ = `Bullet style: Google's XYZ formula, "Accomplished [X] as measured by [Y] by doing [Z]". Do not copy that wording literally. Each bullet should read as one natural sentence that makes the result, the measure, and the method clear.`;
-
+  // The resume + job description are identical across all 4 calls, so they're sent
+  // as one separate "context" block. The server marks it cacheable, so after the
+  // first call the other three reuse it at a fraction of the token cost instead of
+  // re-billing the full resume and job description every time. The ground rules and
+  // bullet-style guidance live once in the server's system prompt for the same reason.
   function ctx(){
     return "=== CANDIDATE RESUME (plain text) ===\n"+resumeText.slice(0,22000)+"\n\n=== JOB DESCRIPTION ===\n"+$("jd").value.trim().slice(0,12000);
   }
@@ -230,38 +227,27 @@ summary{cursor:pointer;font-weight:600}
     ()=>`Act as a senior recruiter at the exact company that posted this job. Identify the company and role from the job description.
 Analyze the resume against the job description and give: a match score out of 100 with a one-sentence rationale, the top 5 missing keywords (exact terms from the job description that the resume lacks or under-uses), the 3 red flags a hiring manager would spot in under 10 seconds, and the top 3 genuine strengths to lean on.
 Reply with only JSON in this shape:
-{"company":"","roleTitle":"","matchScore":0,"scoreRationale":"","missingKeywords":[{"keyword":"","whyItMatters":""}],"redFlags":[{"flag":"","fix":""}],"strengths":[""]}
-
-${ctx()}`,
+{"company":"","roleTitle":"","matchScore":0,"scoreRationale":"","missingKeywords":[{"keyword":"","whyItMatters":""}],"redFlags":[{"flag":"","fix":""}],"strengths":[""]}`,
 
     ()=>`You are an expert resume writer. Using the recruiter analysis below, rewrite the candidate's experience section so it naturally includes the missing keywords (only where truthful) and fixes the 3 red flags. Also write a short professional summary (2 to 3 sentences) aimed at this role.
-${XYZ}
-${RULES}
 Keep the same jobs, employers, titles and dates as the resume. Give 4 to 6 bullets for recent roles, 2 to 3 for older roles, and for roles older than about 12 years use 1 to 2 short bullets so the final resume stays at two pages.
 Reply with only JSON in this shape:
 {"summary":"","experience":[{"title":"","company":"","location":"","dates":"","bullets":[""]}],"keywordsUsed":[""],"flagsFixed":[""]}
 
 === RECRUITER ANALYSIS ===
-${JSON.stringify(results[0])}
-
-${ctx()}`,
+${JSON.stringify(results[0])}`,
 
     ()=>`Now play two roles at once: an ATS parser, and a hiring manager skimming 200 resumes in one sitting. Read the candidate's new resume (summary and experience below, plus the education, skills and certifications from the original resume) and decide which sections or bullets would get skipped, and why (buried keywords, vague openers, no numbers, walls of text, non-standard headings, and so on). Then rewrite those parts so they stop the scroll: strong first words, the result up front, specific and human.
-${XYZ}
-${RULES}
 Return the improved summary and the complete improved experience list (all roles, not just the changed ones).
 Reply with only JSON in this shape:
 {"skippedSections":[{"section":"","why":""}],"atsIssues":[""],"summary":"","experience":[{"title":"","company":"","location":"","dates":"","bullets":[""]}],"whatChanged":[""]}
 
 === NEW SUMMARY AND EXPERIENCE (from step 2) ===
-${JSON.stringify({summary:results[1].summary,experience:results[1].experience})}
-
-${ctx()}`,
+${JSON.stringify({summary:results[1].summary,experience:results[1].experience})}`,
 
     ()=>`Produce the final application documents.
 1) A complete resume as structured JSON, built from the improved summary and experience in step 3 and the candidate's original contact details, skills, education, certifications, languages and other sections. Use plain, standard section names an ATS recognizes. Group skills by category and lead with the terms the job description uses (only ones the candidate truly has). Keep it to two pages at most, so trim older or irrelevant details.
 2) A cover letter for this exact role and company, 250 to 330 words, conversational and specific, that opens with a real hook rather than "I am writing to apply", ties two or three real achievements from the resume to the role's needs, and closes with a simple next step. Address it to "Hiring Team" if no name is given. Use \\n\\n between paragraphs and end with the candidate's name.
-${RULES}
 Reply with only JSON in this shape:
 {"resume":{"name":"","contact":["email","phone","city","links"],"summary":"","skills":[{"category":"","items":[""]}],"experience":[{"title":"","company":"","location":"","dates":"","bullets":[""]}],"education":[{"degree":"","institution":"","dates":"","details":""}],"certifications":[""],"additional":[{"heading":"","items":[""]}]},"coverLetter":""}
 
@@ -269,9 +255,7 @@ Reply with only JSON in this shape:
 ${results[0].company} · ${results[0].roleTitle}
 
 === IMPROVED SUMMARY AND EXPERIENCE (from step 3) ===
-${JSON.stringify({summary:results[2].summary,experience:results[2].experience})}
-
-${ctx()}`
+${JSON.stringify({summary:results[2].summary,experience:results[2].experience})}`
   ];
 
   // ---------- API call (streams from /api/claude) ----------
@@ -283,13 +267,13 @@ ${ctx()}`
     throw {code:"invalid_json", message:"Reply was not valid JSON."};
   }
 
-  async function callClaude(prompt, signal, onText){
+  async function callClaude(instruction, signal, onText){
     let res;
     try{
       res = await fetch("/api/claude",{
         method:"POST", signal,
         headers:{"content-type":"application/json"},
-        body:JSON.stringify({prompt})
+        body:JSON.stringify({context: ctx(), instruction})
       });
     }catch(e){
       if(e.name==="AbortError") throw {code:"cancelled"};

@@ -27,6 +27,11 @@ resume and cover letter as Word files. Works on any device with a browser.
 
 - Each run makes 4 API calls to Claude and streams the reply so long answers
   don't time out.
+- The resume and job description are sent once as a cacheable block
+  (`cache_control`), and the instructions live once in the server's system
+  prompt, also cached. After the first call, the other three reuse both at a
+  fraction of the token cost instead of re-billing the same resume and
+  instructions on every step -- same prompts, same results, lower cost.
 - Anyone who has your deployed URL can use it and will spend your API
   credit — there's no login. If you want to restrict that, the simplest
   option is Vercel's own **Password Protection** (Project → Settings →
