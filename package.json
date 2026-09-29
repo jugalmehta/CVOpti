@@ -2,7 +2,5 @@
   "name": "resume-tailor",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
-  "description": "Tailor a resume and cover letter to a job description with Claude.",
-  "engines": { "node": ">=20" }
+  "description": "Tailor a resume and cover letter to a job description with Claude."
 }

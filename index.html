@@ -87,14 +87,6 @@ summary{cursor:pointer;font-weight:600}
   <h1>Resume Tailor</h1>
   <p class="sub">Upload your resume, paste the job description, and get a tailored ATS-friendly resume and cover letter in Word format.</p>
 
-  <div class="card hidden" id="gate">
-    <h2>Access code</h2>
-    <div class="row">
-      <input type="password" id="code" placeholder="Enter your access code" autocomplete="current-password" style="flex:1;min-width:200px">
-      <button id="saveCode">Save on this device</button>
-    </div>
-  </div>
-
   <div class="grid">
     <div class="card">
       <h2>1. Your resume</h2>
@@ -159,16 +151,6 @@ summary{cursor:pointer;font-weight:600}
   let resumeText = "", style = null;
   let results = {};
   let ctl = null, running = false;
-
-  // ---------- access code ----------
-  const getCode = () => { try{ return localStorage.getItem("rt_code")||""; }catch(e){ return ""; } };
-  const setCode = v => { try{ localStorage.setItem("rt_code",v); }catch(e){} };
-  function needCode(){ $("gate").classList.remove("hidden"); }
-  if(!getCode()) needCode();
-  $("saveCode").addEventListener("click",()=>{
-    const v=$("code").value.trim(); if(!v) return;
-    setCode(v); $("gate").classList.add("hidden"); clearErr(); refresh();
-  });
 
   // ---------- upload ----------
   const drop = $("drop"), fileIn = $("file");
@@ -306,14 +288,13 @@ ${ctx()}`
     try{
       res = await fetch("/api/claude",{
         method:"POST", signal,
-        headers:{"content-type":"application/json","x-access-code":getCode()},
+        headers:{"content-type":"application/json"},
         body:JSON.stringify({prompt})
       });
     }catch(e){
       if(e.name==="AbortError") throw {code:"cancelled"};
       throw {code:"network", message:"Network error."};
     }
-    if(res.status===401) throw {code:"unauthorized"};
     if(!res.ok){
       let m=""; try{ m=(await res.json()).error; }catch(e){}
       throw {code:"server", message:m||("Server error "+res.status)};
@@ -349,7 +330,6 @@ ${ctx()}`
 
   async function run(){
     if(running) return;
-    if(!getCode()){ needCode(); showErr("Enter your access code first."); return; }
     clearErr(); running = true; $("stop").classList.remove("hidden"); refresh();
     let i = 0; while(results[i]) i++;
     let failedAt = -1;
@@ -368,11 +348,9 @@ ${ctx()}`
     }catch(e){
       const map = {
         cancelled:"Stopped. Press the button to continue from the same step.",
-        unauthorized:"Wrong access code.",
         invalid_json:"The reply came back incomplete. Press the button to try this step again.",
         network:"Network problem. Check your connection and press the button to continue."
       };
-      if(e && e.code==="unauthorized"){ try{localStorage.removeItem("rt_code");}catch(_){} needCode(); }
       showErr(map[e&&e.code] || ("Something went wrong: "+((e&&e.message)||e)));
       if(failedAt>=0) setPills(failedAt, e&&e.code==="cancelled"?"":"error");
     }finally{
